@@ -3,9 +3,11 @@ import sqlite3
 import time
 
 st.set_page_config(layout="wide")
+def db_connect():
+    return sqlite3.connect('atm1.db')
 
 def create_table():
-    conn = sqlite3.connect('atm1.db')
+    conn = db_connect()
     c = conn.cursor()
     c.execute(''' CREATE TABLE IF NOT EXISTS ACCOUNT (ACCNO INTEGER PRIMARY KEY AUTOINCREMENT,HOLDER_NAME TEXT NOT NULL, PIN TEXT,
             BALANCE INTEGER  CHECK(BALANCE>=1000), TYPE TEXT ) ''')
@@ -15,7 +17,7 @@ def create_table():
 def get_user(accno):
     if accno is None:
         return None
-    conn = sqlite3.connect('atm1.db')
+    conn = db_connect()
     c = conn.cursor()
     c.execute("SELECT * FROM ACCOUNT WHERE ACCNO=?", (int(accno),))
     data = c.fetchone()
@@ -31,12 +33,12 @@ def deposit(accno, amount):
     if not user:
         return "Account not found"
     new_balance = user[3] + amount 
-    conn = sqlite3.connect('atm1.db')
+    conn = db_connect()
     c = conn.cursor()
     c.execute("UPDATE ACCOUNT SET BALANCE=? WHERE ACCNO=?", (new_balance, accno))
     conn.commit()
     conn.close()
-    return "Deposit Successful"
+    return f"Deposit Successful, New Balance:{new_balance}"
 
 def withdraw(accno, amount):
     user = get_user(accno)
@@ -44,14 +46,14 @@ def withdraw(accno, amount):
         return "Account not found"
     current_balance = user[3]
     if amount > current_balance - 1000:
-        return f"Insufficient Balance: Minimum balance of 1000 must be maintained.So firstly deposit some money."
+        return f"Insufficient Balance: Minimum balance of 1000 must be maintained, so firstly deposit some money."
     new_balance = current_balance - amount
-    conn = sqlite3.connect('atm1.db')
+    conn = db_connect()
     c = conn.cursor()
     c.execute("UPDATE ACCOUNT SET BALANCE=? WHERE ACCNO=?", (new_balance, accno))
     conn.commit()
     conn.close()
-    return f"Withdrawal Successful. New Balance: {new_balance}"
+    return f"Withdrawal Successful, New Balance: {new_balance}"
 
 def change_pin(accno, old_pin, new_pin, confirm):
     user = get_user(accno)
@@ -65,7 +67,7 @@ def change_pin(accno, old_pin, new_pin, confirm):
         return "Old pin and new pin are same"
     if confirm!=new_pin:
         return "New pin and confirm pin not match"
-    conn = sqlite3.connect('atm1.db')
+    conn = db_connect()
     c = conn.cursor()
     c.execute("UPDATE ACCOUNT SET PIN=? WHERE ACCNO=?", (new_pin, accno))
     conn.commit()
@@ -120,8 +122,6 @@ def signin(accno, pin):
         st.session_state.logged_in = True
         st.session_state.page = "home"
         st.rerun()
-   
-
 
 def login_page():
     st.title("ATM Login")
@@ -132,7 +132,6 @@ def login_page():
     if st.button("Create Account"):
         st.session_state.page = "signup"
         st.rerun()
-
 
 def signup_page():
     st.title("Create Account")
@@ -149,7 +148,7 @@ def signup_page():
         elif len(pin) != 4 or not pin.isdigit():
             st.error("PIN must be 4 digits")
         else:
-            conn = sqlite3.connect('atm1.db')
+            conn = db_connect()
             c = conn.cursor()
             c.execute("INSERT INTO ACCOUNT(HOLDER_NAME, PIN, BALANCE, TYPE) VALUES (?, ?, ?, ?)",
                       (name, pin, 1000, acc_type))
@@ -174,7 +173,7 @@ def deposit_page():
     amount = st.number_input("Enter amount", min_value=1)
     if st.button("Deposit"):
         msg = deposit(st.session_state.accno, amount)
-        if msg == "Deposit Successful":
+        if "Successful" in msg :
             st.success(msg)
         else:
             st.error(msg)
@@ -197,7 +196,7 @@ def balance_page():
     st.title("Check Balance")
     bal = get_balance(st.session_state.accno)
     if bal is not None:
-        st.success(f"Available Balance: Rupees{bal}")
+        st.success(f"Available Balance: Rupees {bal}")
     else:
         st.error("Account not found")
 
@@ -209,7 +208,7 @@ def pin_page():
     new_pin = st.text_input("New PIN", type="password")
     confirm=st.text_input("Confirm PIN", type="password")
     if st.button("Update PIN"):
-        msg = change_pin(st.session_state.accno, old_pin, new_pin)
+        msg = change_pin(st.session_state.accno, old_pin, new_pin, confirm)
         if msg == "PIN Updated Successfully":
             st.success(msg)
         else:
@@ -232,7 +231,6 @@ def main():
             balance_page()
         elif st.session_state.page == "pin":
             pin_page()
-
 
 if __name__ == "__main__":
     main()
